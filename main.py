@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Make the AI Judge Laugh — one-line office joke.
 
-Writes the joke exactly as stored in entry.txt to /output/entry.txt.
-The joke is about reply-all: asking to be removed from a thread makes
-twelve more people reply-all to agree, repeating the very sin the
-sender was complaining about. One sentence, concrete, the punch lands
-when the agreement itself becomes the spam.
+The joke: asking to be removed from an email thread by replying-all,
+only for twelve people to reply-all in agreement — the complaint itself
+becomes the spam it was complaining about.
+
+This script validates the single-line entry against the bounty gate
+(one line, no more than 200 characters, no stray whitespace or control
+characters) and writes it verbatim to /output/entry.txt.
 """
 
 from pathlib import Path
@@ -16,26 +18,42 @@ LIMIT = 200
 TARGET = Path("/output/entry.txt")
 
 
-def validate(line):
-    problems = []
+def problems(line):
+    """Return a list of gate violations for one entry line."""
+    found = []
     if not line.strip():
-        problems.append("blank")
+        found.append("blank entry")
     if len(line) > LIMIT:
-        problems.append(f"{len(line)} chars over limit {LIMIT}")
-    if line.count("\n") or line.count("\r"):
-        problems.append("must be one line")
+        found.append(f"{len(line)} chars exceeds limit {LIMIT}")
+    if "\n" in line or "\r" in line:
+        found.append("must be a single line")
     if line != line.strip():
-        problems.append("leading/trailing whitespace")
-    if any(ord(c) < 32 for c in line):
-        problems.append("control character")
-    if problems:
-        raise ValueError("invalid entry: " + "; ".join(problems))
+        found.append("leading/trailing whitespace")
+    if "  " in line:
+        found.append("double space")
+    if any(ord(ch) < 32 for ch in line):
+        found.append("control character present")
+    return found
+
+
+def validate(line):
+    bad = problems(line)
+    if bad:
+        raise ValueError("invalid entry: " + "; ".join(bad))
+
+
+def verify_written():
+    """Read the output back and confirm it is byte-identical to the entry."""
+    written = TARGET.read_text(encoding="utf-8")
+    if written != JOKE:
+        raise ValueError("written output differs from entry")
 
 
 def main():
     validate(JOKE)
     TARGET.parent.mkdir(parents=True, exist_ok=True)
     TARGET.write_text(JOKE, encoding="utf-8")
+    verify_written()
     print(f"wrote {TARGET} ({len(JOKE)} chars)")
 
 
